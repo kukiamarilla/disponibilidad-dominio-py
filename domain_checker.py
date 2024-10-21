@@ -8,13 +8,11 @@ import sys
 
 # Configuración del navegador
 def setup_browser():
-    # Usa Chrome con Selenium
     options = webdriver.ChromeOptions()
     options.add_argument("--headless")  # Ejecutar el navegador en modo headless (sin interfaz gráfica)
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
 
-    # Instalar y utilizar ChromeDriver
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
     return driver
 
@@ -22,61 +20,61 @@ def setup_browser():
 def check_domain_availability(domain_name):
     driver = setup_browser()
 
-    # Visitar la página del NIC
-    driver.get("https://www.nic.py/")
-    time.sleep(3)
-
-    # Dividir el dominio completo en nombre y tipo
-    domain_parts = domain_name.split('.')
-    if len(domain_parts) < 2 or domain_parts[-1] != "py":
-        raise ValueError("Invalid domain format. Domain must end with .py.")
-
-    domain_name = domain_parts[0]
-    domain_type = domain_parts[1]  # Obtener el tipo de dominio
-
-    # Seleccionar el tipo de dominio
-    domain_select = driver.find_element(By.XPATH, '//select')
-    domain_select.click()  # Abre el menú de selección
-    time.sleep(1)  # Esperar un momento para asegurarnos que el menú se abre
-
-    # Seleccionar la opción correspondiente al tipo de dominio
-    option = driver.find_element(By.CSS_SELECTOR, f'[value="{domain_type}"]')
-    option.click()
-
-    # Encontrar el campo de búsqueda y enviar el nombre del dominio
-    search_box = driver.find_element(By.XPATH, '//input[2]')
-    search_box.send_keys(domain_name)
-
-    # Hacer clic en el botón para buscar
-    search_button = driver.find_element(By.ID, 'enviar_formulario')
-    search_button.click()
-
-    # Esperar a que la página se cargue
-    time.sleep(3)
     try:
-        # Usar el selector CSS proporcionado para obtener el estado del dominio
+        # Verificar el formato del dominio
+        domain_parts = domain_name.split('.')
+        if len(domain_parts) < 3 or domain_parts[-1] != "py":
+            raise ValueError(f"Formato de dominio no válido: {domain_name}. El dominio debe tener el formato nombre.tipo.py")
+
+        domain_name = domain_parts[0]
+        domain_type = domain_parts[1]
+
+        # Visitar la página del NIC
+        driver.get("https://www.nic.py/")
+        time.sleep(4)  # Aumentar el tiempo de espera para asegurar que la página cargue
+
+        # Seleccionar el tipo de dominio
+        domain_select = driver.find_element(By.XPATH, '//select')
+        domain_select.click()
+        time.sleep(1)
+
+        # Seleccionar la opción correspondiente al tipo de dominio
+        option = driver.find_element(By.CSS_SELECTOR, f'[value="{domain_type}"]')
+        option.click()
+
+        # Encontrar el campo de búsqueda y enviar el nombre del dominio
+        search_box = driver.find_element(By.XPATH, '//input[2]')
+        search_box.send_keys(domain_name)
+
+        # Hacer clic en el botón para buscar
+        search_button = driver.find_element(By.ID, 'enviar_formulario')
+        search_button.click()
+
+        # Esperar a que la página se cargue
+        time.sleep(5)
+
+        # Obtener el estado de disponibilidad del dominio
         status_element = driver.find_element(By.ID, 'resultados_disponibilidad')
         status_text = status_element.text
 
-        # Cerrar el navegador
-        driver.quit()
-
+        # Procesar la respuesta y construir el JSON
         rows = status_text.split("\n")
-
         avalabilities = {}
         for row in rows:
             row_availabity = row.split(" ")
-
             avalabilities[row_availabity[0].strip()] = row_availabity[1].strip() == "Disponible"
+
         return json.dumps(avalabilities)
 
-    except Exception as e:
-        # Cerrar el navegador en caso de excepción
+    except ValueError as ve:
+        print(f"Error: {ve}")
         driver.quit()
-        raise e
+    except Exception as e:
+        print(f"Ha ocurrido un error al verificar el dominio {domain_name}: {e}")
+        driver.quit()
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        raise ValueError("Domain name not provided.")
+        raise ValueError("No se ha proporcionado el nombre del dominio.")
     domain_name = sys.argv[1]
     print(check_domain_availability(domain_name))
